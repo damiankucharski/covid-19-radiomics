@@ -13,6 +13,31 @@ class XRayLabel(Enum):
     Lung_Opacity = 'Lung_Opacity'
     COVID = 'COVID'
     Viral_Pneumonia = 'Viral Pneumonia'
+    SICK = "SICK"
+
+
+class SubDataSet(Enum):
+
+    ALL = "ALL"
+    SICK_VS_COVID = "SICK_VS_COVID"
+    SICK_VS_HEALTHY = "SICK_VS_HEALTHY"
+    SICK = "SICK"
+
+
+def get_subdataset_metadata(metadata: pd.DataFrame, subdataset: SubDataSet):
+
+    if subdataset == SubDataSet.ALL:
+        return metadata
+    if subdataset == SubDataSet.SICK_VS_COVID:
+        return metadata[metadata.label.isin([XRayLabel.COVID.value, XRayLabel.Normal.value])]
+    if subdataset == SubDataSet.SICK_VS_HEALTHY:
+        metadata = metadata.copy()
+        metadata.label = np.where(metadata.label == XRayLabel.Normal.value, XRayLabel.Normal.value, XRayLabel.SICK.value)
+        return metadata
+    if subdataset == SubDataSet.SICK:
+        return metadata[metadata.label != XRayLabel.Normal.value]
+
+    raise ValueError("Incorrect subdataset label")
 
 @dataclass
 class XRayStudy:
