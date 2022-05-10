@@ -1,8 +1,6 @@
 import os
 from typing import NamedTuple, Union
 
-import numpy as np
-import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.base import TransformerMixin
 from sklearn.pipeline import make_pipeline
@@ -14,7 +12,9 @@ from gems.io import Json, Pickle
 from src.preprocessing import CorrelationFilter, VarianceFilter
 from src.preprocessing import DataframeTransformerWrapper as DTW
 from src.pipelines.load_args import load_args
-
+from src.pipelines.pipeline_helpers import run_transformer_pipeline_on_train_and_test
+from src.data import load_feature_sets
+from tracking.tracking_utils import log_metadata
 
 class PreprocessingPipelineConfig(NamedTuple):
     correlation: float = 0.95
@@ -51,43 +51,28 @@ class PreprocessingPipeline(TransformerMixin):
 
 
 def init_neptune():
-    from tracking.preprocessing import project, api_token
+    from tracking.configs.preprocessing import project, api_token
     run = neptune.init(project=project, api_token=api_token)
     return run
 
 
 if __name__ == "__main__":
-    run = init_neptune()
-    args = load_args()
 
-    run_label = run._label
+    args = load_args()
 
     config = PreprocessingPipelineConfig.config_from_json(args.config)
     pipeline = PreprocessingPipeline(config)
-    features = pd.read_csv(args.features, index_col=0)
-    metadata = pd.read_csv(args.metadata, index_col=0)
 
-    run['config'] = config._asdict()
-    run['meta/features_source'] = args.features
-    run['meta/metadata_source'] = args.metadata
-    run['meta/features_shape'] = features.shape
 
-    features_copy = features.copy()
+    features, features_train, features_test, metadata = load_feature_sets(args.features, args.metadata)
 
-    index_train, index_test = metadata[metadata.fold != 0].index, metadata[metadata.fold == 0].index
+    features_transformed, train_transformed, test_transformed = run_transformer_pipeline_on_train_and_test(pipeline,
+                                                                                                           features,
+                                                                                                           features_train,
+                                                                                                           features_test)
 
-    features_train = features_copy.loc[index_train, :]
-    features_test = features_copy.loc[index_test, :]
-
-    run['meta/features_train_shape'] = features_train.shape
-    run['meta/features_test_shape'] = features_test.shape
-
-    train_transformed = pipeline.fit_transform(features_train)
-    test_transformed = pipeline.transform(features_test)
-
-    features_copy = features_copy.loc[:, train_transformed.columns]
-    features_copy.loc[train_transformed.index, :] = train_transformed
-    features_copy.loc[test_transformed.index, :] = test_transformed
+    run = init_neptune()
+    run_label = run._label
 
     output_path_dir = f'./experiments/Preprocessing/{run_label}'
     os.makedirs(output_path_dir, exist_ok=True)
@@ -95,9 +80,12 @@ if __name__ == "__main__":
     output_path_features = os.path.join(output_path_dir, 'preprocessed_features.csv')
     output_path_pipeline = os.path.join(output_path_dir, 'pipeline.pkl')
 
-    features_copy.to_csv()
+    features_transformed.to_csv(output_path_features)
     Pickle.save(output_path_pipeline, pipeline)
 
-    run['output_shape'] = features_copy.shape
+
+    log_metadata(run, config, args, features, features_train, features_test, args.suffix)
+
+    run['output_shape'] = features_transformed.shape
     run['artifacts/preprocessed_features'].upload(output_path_features)
     run['artifacts/pipeline'].upload(output_path_pipeline)

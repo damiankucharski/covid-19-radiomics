@@ -1,0 +1,6 @@
+{
+  "name": "LASSO",
+  "params" : {
+    "scoring" : "f1_weighted"
+  }
+}

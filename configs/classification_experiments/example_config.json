@@ -1,0 +1,18 @@
+{
+  "preprocessing_pipeline_config" : {
+    "correlation" : 0.95,
+    "variance" : 0.00000000001
+  },
+  "feature_selection_pipeline_config" : {
+    "name" : "LASSO",
+    "params" : {
+      "scoring" : "f1"
+    }
+  },
+  "classification_pipeline_config" : {
+    "name" : "KNeighborsClassifier",
+    "params" : {
+      "n_neighbors" : 5
+    }
+  }
+}

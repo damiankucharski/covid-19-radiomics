@@ -33,12 +33,13 @@ def get_selector_by_type(type: SelectorType):
 
 
 class LassoFeatureSelector(SelectorMixin):
-    def __init__(self, scoring="f1", cv=None):
+    def __init__(self, scoring="f1", cv=None, n_features=None):
         super(LassoFeatureSelector, self).__init__()
         self.best_C = None
         self.best_estimator = None
         self.scoring = scoring
         self.cv = cv
+        self.n_features = n_features
 
     def fit(self, train_samples: pd.DataFrame, y=None):
         print("Selecting features using LASSO algorithm")
@@ -48,20 +49,24 @@ class LassoFeatureSelector(SelectorMixin):
         train_samples[:] = scaler.fit_transform(train_samples)
 
         np.random.seed(1992)
-        lr = LogisticRegression(penalty="l1", random_state=1992, max_iter=1000, solver="liblinear",
+        lr = LogisticRegression(penalty="l1", random_state=1992, max_iter=1000, solver="saga",
                                 class_weight="balanced")
-        gscv = GridSearchCV(lr, scoring=self.scoring, cv=self.cv, param_grid={"C": np.logspace(-4, 4, 100)})
+        gscv = GridSearchCV(lr, scoring=self.scoring, cv=self.cv, param_grid={"C": np.logspace(-4, 4, 100)}, verbose=2)
         gscv.fit(train_samples, y)
 
         self.best_C = gscv.best_params_["C"]
         self.best_estimator = gscv.best_estimator_
         print("The best C for LASSO:", self.best_C)
 
-        where_mask = ~(np.isclose(self.best_estimator.coef_, [0], atol=1e-3)).squeeze()
+        self.coef = np.abs(self.best_estimator.coef_) if self.best_estimator.coef_.shape[0] == 1 else\
+            np.abs(self.best_estimator.coef_).max(axis=0)[None, :]
 
-        self.selected_features = np.array(train_samples.columns)[where_mask]
+        if self.n_features is None:
+            self.support_ = ~(np.isclose(self.coef, [0], atol=1e-3)).squeeze()
+        else:
+            self.support_ = self.get_n_most_important_features(self.n_features, return_support=True)
 
-        self.support_ = np.where(where_mask, True, False)
+        self.selected_features = np.array(train_samples.columns)[self.support_]
 
         return self
 
@@ -70,6 +75,20 @@ class LassoFeatureSelector(SelectorMixin):
 
     def transform(self, X):
         return X.loc[:, self._get_support_mask()]
+
+    def get_n_most_important_features(self, n_features, X = None, return_support=False):
+
+        if X is None and not return_support:
+            raise Exception("Either X or return_support must be provided")
+
+        arange = np.arange(self.expected_shape[1])
+        coef_argsort = self.coef.argsort()[::-1]  # descending
+        support = np.zeros_like(arange, dtype=bool)
+        support[coef_argsort[:self.n_features]] = True
+        if return_support:
+            return support
+        else:
+            return X.loc[:, support]
 
 
 class GeneticFeatureSelector(SelectorMixin):
@@ -144,7 +163,7 @@ class SequentialFeatureSelector(SelectorMixin):
 
 class PassthroughFeatureSelector(SelectorMixin):
 
-    def __init__(self):
+    def __init__(self, cv=None):
         super(PassthroughFeatureSelector, self).__init__()
 
     def fit(self, train_samples: pd.DataFrame, y=None):

@@ -132,7 +132,7 @@ dmypy.json
 
 /Data/
 /Resources/
-/tracking/
+/tracking/configs/
 
 # idea
 
@@ -142,3 +142,7 @@ dmypy.json
 
 /.neptune/
 /src/pipelines/.neptune/
+
+#experiments
+
+

@@ -1,0 +1,3 @@
+PREPROCESSING_PIPELINE_CONFIG = "preprocessing_pipeline_config"
+FEATURE_SELECTION_PIPELINE_CONFIG = "feature_selection_pipeline_config"
+CLASSIFICATION_PIPELINE_CONFIG = "classification_pipeline_config"

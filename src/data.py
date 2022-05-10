@@ -39,6 +39,18 @@ def get_subdataset_metadata(metadata: pd.DataFrame, subdataset: SubDataSet):
 
     raise ValueError("Incorrect subdataset label")
 
+
+def load_feature_sets(features_path, metadata_path):
+    features = pd.read_csv(features_path, index_col=0)
+    metadata = pd.read_csv(metadata_path, index_col=0)
+
+    index_train, index_test = metadata[metadata.fold != 0].index, metadata[metadata.fold == 0].index
+
+    features_train = features.loc[index_train, :]
+    features_test = features.loc[index_test, :]
+
+    return features, features_train, features_test, metadata
+
 @dataclass
 class XRayStudy:
 
