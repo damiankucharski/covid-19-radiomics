@@ -19,7 +19,7 @@ class XRayLabel(Enum):
 class SubDataSet(Enum):
 
     ALL = "ALL"
-    SICK_VS_COVID = "SICK_VS_COVID"
+    COVID_VS_HEALTHY = "COVID_VS_HEALTHY"
     SICK_VS_HEALTHY = "SICK_VS_HEALTHY"
     SICK = "SICK"
 
@@ -28,7 +28,7 @@ def get_subdataset_metadata(metadata: pd.DataFrame, subdataset: SubDataSet):
 
     if subdataset == SubDataSet.ALL:
         return metadata
-    if subdataset == SubDataSet.SICK_VS_COVID:
+    if subdataset == SubDataSet.COVID_VS_HEALTHY:
         return metadata[metadata.label.isin([XRayLabel.COVID.value, XRayLabel.Normal.value])]
     if subdataset == SubDataSet.SICK_VS_HEALTHY:
         metadata = metadata.copy()
@@ -44,7 +44,7 @@ def load_feature_sets(features_path, metadata_path):
     features = pd.read_csv(features_path, index_col=0)
     metadata = pd.read_csv(metadata_path, index_col=0)
 
-    index_train, index_test = metadata[metadata.fold != 0].index, metadata[metadata.fold == 0].index
+    index_train, index_test = metadata[metadata.fold > 0].index, metadata[metadata.fold < 1].index
 
     features_train = features.loc[index_train, :]
     features_test = features.loc[index_test, :]

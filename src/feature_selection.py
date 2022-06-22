@@ -7,9 +7,14 @@ from genetic_selection import GeneticSelectionCV
 from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
 from mlxtend.feature_selection import SequentialFeatureSelector as SFS
-
+from mrmr import mrmr_classif
 from sklearn.feature_selection import SelectorMixin
+
+from src.preprocessing import DataframeTransformerWrapper as DTW
 
 
 class SelectorType(Enum):
@@ -17,6 +22,8 @@ class SelectorType(Enum):
     GENETIC = 'GENETIC'
     SFS = 'SFS'
     PASSTHROUGH = 'PASSTHROUGH'
+    MRMR = "MRMR"
+    RF_TOP = "RF_TOP"
 
 
 def get_selector_by_type(type: SelectorType):
@@ -28,6 +35,10 @@ def get_selector_by_type(type: SelectorType):
         return SequentialFeatureSelector
     if type == SelectorType.PASSTHROUGH:
         return PassthroughFeatureSelector
+    if type == SelectorType.MRMR:
+        return MRMRSelector
+    if type == SelectorType.RF_TOP:
+        return RandomForestTopFeatureSelector
 
     return None
 
@@ -49,9 +60,11 @@ class LassoFeatureSelector(SelectorMixin):
         train_samples[:] = scaler.fit_transform(train_samples)
 
         np.random.seed(1992)
-        lr = LogisticRegression(penalty="l1", random_state=1992, max_iter=1000, solver="saga",
+
+
+        lr = LogisticRegression(penalty="l1", random_state=1992, max_iter=100, solver='liblinear',
                                 class_weight="balanced")
-        gscv = GridSearchCV(lr, scoring=self.scoring, cv=self.cv, param_grid={"C": np.logspace(-4, 4, 100)}, verbose=2)
+        gscv = GridSearchCV(lr, scoring=self.scoring, cv=self.cv, param_grid={"C": np.logspace(-4, 1, 50)}, verbose=2)
         gscv.fit(train_samples, y)
 
         self.best_C = gscv.best_params_["C"]
@@ -92,7 +105,7 @@ class LassoFeatureSelector(SelectorMixin):
 
 
 class GeneticFeatureSelector(SelectorMixin):
-    def __init__(self, estimator, scoring="f1", cv=None, max_features=20):
+    def __init__(self, estimator=LogisticRegression(), scoring="f1", cv=None, max_features=20):
         super(GeneticFeatureSelector, self).__init__()
         self.estimator = estimator
 
@@ -135,10 +148,12 @@ class GeneticFeatureSelector(SelectorMixin):
 
 
 class SequentialFeatureSelector(SelectorMixin):
-    def __init__(self, estimator, scoring="f1", cv=None, forward=True, floating=False, k_features="best"):
+    def __init__(self, estimator = LogisticRegression(), scoring="f1", cv=None, forward=True, floating=False, k_features="best"):
         super(SequentialFeatureSelector, self).__init__()
         self.estimator = estimator
         self.best_estimator = None
+        if isinstance(k_features, list):
+            k_features = tuple(k_features)
         self.selector = SFS(self.estimator, k_features=k_features, scoring=scoring, cv=cv, n_jobs=-1,
                             verbose=2, forward=forward, floating=floating)
 
@@ -160,6 +175,49 @@ class SequentialFeatureSelector(SelectorMixin):
     def transform(self, X):
         return X.loc[:, self._get_support_mask()]
 
+class MRMRSelector(SelectorMixin):
+    def __init__(self, K = 20, cv=None):
+        super(MRMRSelector, self).__init__()
+        self.selector = mrmr_classif
+        self.K = K
+
+    def fit(self, train_samples: pd.DataFrame, y=None):
+        print("Selecting features using MRMR algorithm")
+        self.expected_shape = train_samples.shape
+        np.random.seed(1992)
+        self.selected_features = self.selector(X=train_samples, y=y, K=self.K)
+        self.support_ = np.zeros((self.expected_shape[1]), dtype=bool)
+        for feature in self.selected_features:
+            self.support_[train_samples.columns.get_loc(feature)] = True
+
+        return self
+
+    def _get_support_mask(self):
+        return self.support_
+
+    def transform(self, X):
+        return X.loc[:, self._get_support_mask()]
+
+
+class RandomForestTopFeatureSelector(SelectorMixin):
+
+    def __init__(self, K=20, cv=None):
+        self.K = K
+        self.estimator = RandomForestClassifier(random_state=1992, verbose=1, n_jobs=-1)
+        self.selector = None
+
+    def fit(self, X, y):
+        print("Selecting features with Random Forest importances")
+        self.estimator.fit(X, y)
+        self.selector = SelectFromModel(self.estimator, prefit=True, max_features=self.K)
+        self.support_ = self.selector.get_support()
+        return self
+
+    def transform(self, X):
+        return X.loc[:, self._get_support_mask()]
+
+    def _get_support_mask(self):
+        return self.support_
 
 class PassthroughFeatureSelector(SelectorMixin):
 

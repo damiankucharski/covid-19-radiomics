@@ -1,0 +1,9 @@
+{
+  "name": "SFS",
+  "params" : {
+    "scoring" : "f1",
+    "forward" : true,
+    "floating": false,
+    "k_features": [1,20]
+  }
+}

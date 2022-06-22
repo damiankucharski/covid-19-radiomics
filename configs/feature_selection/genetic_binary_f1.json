@@ -1,0 +1,6 @@
+{
+  "name": "GENETIC",
+  "params" : {
+    "scoring" : "f1"
+  }
+}

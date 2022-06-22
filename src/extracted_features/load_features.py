@@ -1,4 +1,4 @@
 import pandas as pd
 
-def load_features():
-    return pd.read_csv('./src/extracted_features/features.csv', index_col=0)
+def load_features(path = './src/extracted_features/features.csv'):
+    return pd.read_csv(path, index_col=0)

@@ -1,4 +1,4 @@
 import pandas as pd
 
-def load_metadata():
-    return pd.read_csv('./src/metadata/metadata.csv', index_col=0)
+def load_metadata(path = './src/metadata/metadata.csv'):
+    return pd.read_csv(path, index_col=0)

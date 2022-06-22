@@ -38,4 +38,4 @@ def get_classifier_by_type(classifier_type : ClassifierType):
 
 def get_stratified_folds(X, y):
     skf = StratifiedKFold(n_splits=5)
-    return skf.split(X, y)
+    return list(skf.split(X, y))

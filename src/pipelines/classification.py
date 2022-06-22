@@ -30,7 +30,7 @@ class ClassificationPipeline(TransformerMixin):
         self.classifier = get_classifier_by_type(ClassifierType(config.name))(config.params)
 
 
-    def fit(self, X, y=None):
+    def fit(self, X, y):
         self.classifier.fit(X, y)
         return self
 
